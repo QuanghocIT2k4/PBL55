@@ -1,0 +1,12 @@
+
+.env
+
+venv/
+
+# Byte-compiled / optimized files
+__pycache__/
+*.pyc
+
+# Media files
+# Chứa ảnh từ RPi và User uploads
+media/
