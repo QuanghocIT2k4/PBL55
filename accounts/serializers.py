@@ -226,5 +226,3 @@ class AdminUserManagementSerializer(serializers.ModelSerializer):
         instance.save(update_fields=['first_name', 'last_name', 'user_type', 'is_active', 'updated_at'])
         print(f"DEBUG: AdminUserManagementSerializer - User đã update: {instance.id}")
         return instance
-
-    print("DEBUG: accounts/serializers.py - Đã định nghĩa xong AdminUserManagementSerializer")

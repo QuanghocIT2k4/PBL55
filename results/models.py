@@ -9,17 +9,38 @@ from uploads.models import UserUpload # Model chứa file gốc do user upload
 # from accounts.models import CustomUser # Có thể cần nếu muốn liên kết trực tiếp người xử lý
 
 def get_processed_image_path(instance, filename):
-    """Tạo đường dẫn lưu file ảnh ĐÃ XỬ LÝ."""
-    ext = filename.split('.')[-1]
+    """
+    Tạo đường dẫn lưu file ảnh ĐÃ XỬ LÝ, phân biệt nguồn gốc.
+    instance: Đối tượng ProcessingResult đang được lưu.
+    filename: Tên file gốc (thường là tên mà RPi gửi lên hoặc tên được tạo từ base64).
+    """
+    # Tách phần mở rộng file (extension)
+    # Đảm bảo filename không rỗng và có dấu chấm trước khi split
+    name_part, ext_part = os.path.splitext(filename)
+    ext = ext_part[1:] if ext_part else 'jpg' # Lấy phần mở rộng không có dấu chấm, mặc định là jpg
+
     # Tạo thư mục con theo năm/tháng/ngày để dễ quản lý
     today = date.today()
     year = today.strftime("%Y")
     month = today.strftime("%m")
     day = today.strftime("%d")
+
     # Tạo tên file duy nhất
     unique_id = uuid.uuid4()
-    filename = f"processed_{year}{month}{day}_{unique_id}.{ext}"
-    return os.path.join('processed_results', year, month, day, filename)
+    new_filename = f"processed_{year}{month}{day}_{unique_id}.{ext}"
+
+    # Xác định thư mục con dựa trên nguồn gốc
+    if instance.source_upload_id is not None: # Kiểm tra trực tiếp FK ID để tránh query không cần thiết nếu instance chưa lưu
+        # Hoặc bạn có thể dùng instance.source_upload nếu bạn chắc chắn nó đã được gán
+        # và không ngại một query tiềm năng (nếu chưa được select_related/prefetch_related)
+        source_folder = 'user_uploads_processed'
+        # Tùy chọn: thêm ID của user hoặc upload gốc vào đường dẫn
+        # path_prefix = f'user_{instance.source_upload.uploaded_by_id}/upload_{instance.source_upload_id}'
+        # return os.path.join('processed_results', source_folder, path_prefix, year, month, day, new_filename)
+    else:
+        source_folder = 'camera_captures_processed'
+
+    return os.path.join('processed_results', source_folder, year, month, day, new_filename)
 
 class ProcessingResult(models.Model):
     """
@@ -31,16 +52,16 @@ class ProcessingResult(models.Model):
         UserUpload,
         on_delete=models.SET_NULL, # Nếu xóa file upload gốc, giữ lại kết quả nhưng mất liên kết
         # hoặc models.CASCADE: Nếu xóa file upload gốc thì xóa luôn kết quả này
-        null=True,           # Cho phép NULL (nghĩa là kết quả này từ camera RPi trực tiếp)
-        blank=True,          # Cho phép để trống trong form (nếu dùng Django Forms/Admin)
+        null=True,          # Cho phép NULL (nghĩa là kết quả này từ camera RPi trực tiếp)
+        blank=True,         # Cho phép để trống trong form (nếu dùng Django Forms/Admin)
         related_name='processing_result', # Tên để truy cập ngược từ UserUpload instance
-                                         # Ví dụ: user_upload_obj.processing_result
+                                        # Ví dụ: user_upload_obj.processing_result
         verbose_name="File Upload Gốc"
     )
 
     # --- Thông tin kết quả xử lý ---
     processed_image = models.ImageField(
-        upload_to=get_processed_image_path, # Đường dẫn lưu file ảnh ĐÃ CÓ bounding box/kết quả
+        upload_to=get_processed_image_path, # <<< Sử dụng hàm đã cập nhật
         verbose_name="Ảnh Đã Xử Lý"
     )
     detection_timestamp = models.DateTimeField(
